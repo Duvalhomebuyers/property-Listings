@@ -19,6 +19,65 @@ async function supabaseFetch(path, options = {}) {
   return res.json();
 }
 
+// ─── SUPABASE AUTH HELPERS ───
+async function supabaseSignIn(email, password) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.msg || "Login failed");
+  return data;
+}
+
+async function supabaseGetSession() {
+  const token = localStorage.getItem("sb_access_token");
+  if (!token) return null;
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) {
+    localStorage.removeItem("sb_access_token");
+    localStorage.removeItem("sb_refresh_token");
+    return null;
+  }
+  return await res.json();
+}
+
+async function supabaseRefreshSession() {
+  const refreshToken = localStorage.getItem("sb_refresh_token");
+  if (!refreshToken) return null;
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+  if (!res.ok) {
+    localStorage.removeItem("sb_access_token");
+    localStorage.removeItem("sb_refresh_token");
+    return null;
+  }
+  const data = await res.json();
+  localStorage.setItem("sb_access_token", data.access_token);
+  localStorage.setItem("sb_refresh_token", data.refresh_token);
+  return data;
+}
+
+function supabaseSignOut() {
+  localStorage.removeItem("sb_access_token");
+  localStorage.removeItem("sb_refresh_token");
+}
+
 function generateId() {
   return Math.random().toString(36).substring(2, 10);
 }
@@ -60,8 +119,97 @@ function formatCurrency(val) {
   return "$" + num.toLocaleString();
 }
 
+// ─── LOGIN VIEW ───
+function LoginView({ onLogin }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
+  const handleLogin = async () => {
+    setLoggingIn(true);
+    setLoginError("");
+    try {
+      const session = await supabaseSignIn(email, password);
+      localStorage.setItem("sb_access_token", session.access_token);
+      localStorage.setItem("sb_refresh_token", session.refresh_token);
+      onLogin();
+    } catch (e) {
+      setLoginError(e.message || "Login failed. Check your email and password.");
+    }
+    setLoggingIn(false);
+  };
+
+  const inputStyle = {
+    width: "100%",
+    padding: "12px 14px",
+    border: "1px solid #ccc",
+    borderRadius: "6px",
+    fontSize: "15px",
+    fontFamily: "Arial, sans-serif",
+    boxSizing: "border-box",
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#f5f5f5", fontFamily: "Arial, sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ maxWidth: "400px", width: "100%", padding: "16px" }}>
+        <div style={{ background: "#fff", borderRadius: "8px", padding: "40px 30px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)", textAlign: "center" }}>
+          <img
+            src="https://static.wixstatic.com/media/f6a0b0_5a6ee2bcabd8487d91d5db349b37cf99~mv2.png/v1/fill/w_582,h_225,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/Modernized%20Wholesale%20Logo%20(3).png"
+            alt="Wholesale Realty"
+            style={{ height: "60px", marginBottom: "24px" }}
+          />
+          <h1 style={{ fontSize: "22px", fontWeight: "700", color: "#222", marginBottom: "6px" }}>Property Listing Generator</h1>
+          <p style={{ fontSize: "14px", color: "#888", marginBottom: "24px" }}>Sign in to create listings</p>
+
+          {loginError && (
+            <div style={{ background: "#fee", color: "#c00", padding: "10px 14px", borderRadius: "6px", fontSize: "13px", marginBottom: "16px", textAlign: "left" }}>
+              {loginError}
+            </div>
+          )}
+
+          <div style={{ marginBottom: "14px", textAlign: "left" }}>
+            <label style={{ display: "block", fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px", color: "#666", marginBottom: "4px" }}>Email</label>
+            <input
+              style={inputStyle}
+              type="email"
+              placeholder="you@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+            />
+          </div>
+          <div style={{ marginBottom: "20px", textAlign: "left" }}>
+            <label style={{ display: "block", fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px", color: "#666", marginBottom: "4px" }}>Password</label>
+            <input
+              style={inputStyle}
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+            />
+          </div>
+          <button
+            onClick={handleLogin}
+            disabled={loggingIn}
+            style={{
+              width: "100%", padding: "14px", fontSize: "15px", fontWeight: "700",
+              textTransform: "uppercase", letterSpacing: "2px", border: "none",
+              borderRadius: "6px", color: "#fff", background: "#222",
+              cursor: loggingIn ? "not-allowed" : "pointer", opacity: loggingIn ? 0.6 : 1,
+            }}
+          >
+            {loggingIn ? "Signing in..." : "Sign In"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── FORM VIEW ───
-function FormView({ data, setData, onGenerate, saving }) {
+function FormView({ data, setData, onGenerate, saving, onSignOut }) {
   const set = (key, val) => setData((d) => ({ ...d, [key]: val }));
   const setComp = (i, key, val) =>
     setData((d) => {
@@ -103,6 +251,12 @@ function FormView({ data, setData, onGenerate, saving }) {
         <div style={{ textAlign: "center", marginBottom: "30px" }}>
           <h1 style={{ fontSize: "28px", fontWeight: "700", color: "#222" }}>Property Listing Generator</h1>
           <p style={{ color: "#888", fontSize: "14px", marginTop: "6px" }}>Fill in details below to create a shareable property page</p>
+          <button
+            onClick={onSignOut}
+            style={{ marginTop: "10px", padding: "6px 16px", fontSize: "12px", background: "none", border: "1px solid #ccc", borderRadius: "20px", color: "#888", cursor: "pointer" }}
+          >
+            Sign Out
+          </button>
         </div>
 
         <div style={{ background: "#fff", borderRadius: "8px", padding: "30px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
@@ -410,17 +564,19 @@ function PropertyView({ data, onBack, shareUrl }) {
         <div style={{ padding: "30px 16px", textAlign: "center" }}>
           <div style={{ maxWidth: "900px", margin: "0 auto" }}>
             <h2 style={sectionHeading}>NUMBERS</h2>
-            <div className="numbers-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "30px" }}>
-              {[
-                { value: formatCurrency(data.arv), label: "Wholesale Realty ARV Opinion" },
-                { value: data.rehabEstimate || "—", label: "Rehab Estimate" },
-                { value: formatCurrency(data.monthlyRent), label: "Estimated Monthly Rent" },
-              ].map((item, i) => (
-                <div key={i}>
-                  <div className="number-value" style={{ fontSize: "32px", fontWeight: "700", marginBottom: "8px" }}>{item.value}</div>
-                  <div style={{ fontSize: "13px", color: "#666", textTransform: "uppercase", letterSpacing: "1px" }}>{item.label}</div>
-                </div>
-              ))}
+            <div style={{ background: "#f2f2f2", borderRadius: "8px", padding: "24px 20px" }}>
+              <div className="numbers-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "30px" }}>
+                {[
+                  { value: formatCurrency(data.arv), label: "ARV" },
+                  { value: data.rehabEstimate || "—", label: "Rehab Estimate" },
+                  { value: formatCurrency(data.monthlyRent), label: "Estimated Monthly Rent" },
+                ].map((item, i) => (
+                  <div key={i}>
+                    <div className="number-value" style={{ fontSize: "32px", fontWeight: "700", marginBottom: "8px" }}>{item.value}</div>
+                    <div style={{ fontSize: "13px", color: "#666", textTransform: "uppercase", letterSpacing: "1px" }}>{item.label}</div>
+                  </div>
+                ))}
+              </div>
             </div>
             {data.photosLink && (
               <div style={{ marginTop: "30px" }}>
@@ -546,12 +702,17 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [isSharedView, setIsSharedView] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const id = params.get("p");
+
     if (id) {
+      // Shared link — no auth needed, go straight to property view
       setIsSharedView(true);
+      setAuthChecked(true);
       supabaseFetch(`/properties?slug=eq.${id}&select=*`)
         .then((rows) => {
           if (rows.length > 0) {
@@ -568,10 +729,44 @@ export default function App() {
           setView("form");
         });
     } else {
+      // No shared link — check if user is logged in
       setIsSharedView(false);
-      setView("form");
+      supabaseGetSession()
+        .then((user) => {
+          if (user) {
+            setIsAuthenticated(true);
+            setView("form");
+          } else {
+            // Try refreshing the session
+            return supabaseRefreshSession().then((session) => {
+              if (session) {
+                setIsAuthenticated(true);
+                setView("form");
+              } else {
+                setIsAuthenticated(false);
+                setView("login");
+              }
+            });
+          }
+        })
+        .catch(() => {
+          setIsAuthenticated(false);
+          setView("login");
+        })
+        .finally(() => setAuthChecked(true));
     }
   }, []);
+
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+    setView("form");
+  };
+
+  const handleSignOut = () => {
+    supabaseSignOut();
+    setIsAuthenticated(false);
+    setView("login");
+  };
 
   const generate = useCallback(async () => {
     setSaving(true);
@@ -592,7 +787,7 @@ export default function App() {
     setSaving(false);
   }, [data]);
 
-  if (view === "loading") {
+  if (!authChecked || view === "loading") {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "Arial, sans-serif" }}>
         <div>Loading...</div>
@@ -605,8 +800,10 @@ export default function App() {
       {error && (
         <div style={{ position: "fixed", top: "16px", right: "16px", zIndex: 100, background: "#e53e3e", color: "#fff", padding: "10px 18px", borderRadius: "8px", fontSize: "14px", boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>{error}</div>
       )}
-      {view === "form" ? (
-        <FormView data={data} setData={setData} onGenerate={generate} saving={saving} />
+      {view === "login" ? (
+        <LoginView onLogin={handleLogin} />
+      ) : view === "form" ? (
+        <FormView data={data} setData={setData} onGenerate={generate} saving={saving} onSignOut={handleSignOut} />
       ) : (
         <PropertyView data={data} onBack={isSharedView ? null : () => { setView("form"); window.history.pushState({}, "", window.location.pathname); }} shareUrl={shareUrl} />
       )}
