@@ -25,6 +25,7 @@ function generateId() {
 
 const INITIAL_DATA = {
   address: "",
+  askingPrice: "",
   shortDescription: "",
   beds: "",
   baths: "",
@@ -111,6 +112,10 @@ function FormView({ data, setData, onGenerate, saving }) {
             <div style={{ marginBottom: "12px" }}>
               <label style={labelStyle}>Full Property Address</label>
               <input style={inputStyle} placeholder="39 Crompton Pl, Palm Coast, FL 32137" value={data.address} onChange={(e) => set("address", e.target.value)} />
+            </div>
+            <div style={{ marginBottom: "12px" }}>
+              <label style={labelStyle}>Asking Price</label>
+              <input style={inputStyle} placeholder="$199,900" value={data.askingPrice} onChange={(e) => set("askingPrice", e.target.value)} />
             </div>
             <div>
               <label style={labelStyle}>Short Description</label>
@@ -326,6 +331,11 @@ function PropertyView({ data, onBack, shareUrl }) {
             <h1 style={{ fontSize: "28px", fontWeight: "700", color: "#fff", margin: "0 0 12px 0", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>
               {data.address || "Property Address"}
             </h1>
+            {data.askingPrice && (
+              <div style={{ fontSize: "32px", fontWeight: "700", color: "#fff", margin: "0 0 12px 0", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>
+                {data.askingPrice}
+              </div>
+            )}
             <p style={{ fontSize: "15px", color: "rgba(255,255,255,0.9)", maxWidth: "620px", lineHeight: "1.6", margin: 0, textShadow: "0 1px 4px rgba(0,0,0,0.4)" }}>
               {data.shortDescription || "Property description goes here."}
             </p>
