@@ -778,7 +778,7 @@ export default function App() {
         method: "POST",
         body: JSON.stringify({ slug, data, address: data.address }),
       });
-      const url = window.location.origin + window.location.pathname + "?p=" + slug;
+      const url = window.location.origin + "/p/" + slug;
       setShareUrl(url);
       setView("preview");
       window.history.pushState({}, "", url);
