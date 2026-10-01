@@ -487,7 +487,7 @@ function PropertyView({ data, onBack, shareUrl }) {
               {data.address || "Property Address"}
             </h1>
             {data.askingPrice && (
-              <div style={{ fontSize: "32px", fontWeight: "700", color: "#fff", margin: "0 0 12px 0", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>
+              <div className="hero-price" style={{ fontSize: "32px", fontWeight: "700", color: "#fff", margin: "0 0 12px 0", textShadow: "0 2px 8px rgba(0,0,0,0.5)" }}>
                 {data.askingPrice}
               </div>
             )}
@@ -677,10 +677,31 @@ function PropertyView({ data, onBack, shareUrl }) {
       {/* RESPONSIVE MOBILE STYLES */}
       <style>{`
         @media (max-width: 768px) {
-          .property-hero { height: 300px !important; }
-          .property-hero-overlay h1 { font-size: 20px !important; }
-          .property-hero-overlay p { font-size: 13px !important; }
-          .property-hero-overlay img { height: 60px !important; }
+          .property-hero { height: 420px !important; }
+          .property-hero-overlay {
+            padding: 16px !important;
+            overflow: hidden !important;
+          }
+          .property-hero-overlay img {
+            height: 55px !important;
+            max-width: 80% !important;
+            object-fit: contain !important;
+            margin-bottom: 12px !important;
+          }
+          .property-hero-overlay h1 {
+            font-size: 19px !important;
+            margin: 0 0 8px 0 !important;
+            line-height: 1.25 !important;
+            word-break: break-word !important;
+          }
+          .hero-price {
+            font-size: 24px !important;
+            margin: 0 0 8px 0 !important;
+          }
+          .property-hero-overlay p {
+            font-size: 13px !important;
+            line-height: 1.45 !important;
+          }
           .photos-grid { grid-template-columns: 1fr !important; }
           .numbers-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
           .comps-grid { grid-template-columns: 1fr !important; }
@@ -689,6 +710,16 @@ function PropertyView({ data, onBack, shareUrl }) {
           .showings-phone { font-size: 26px !important; }
           .number-value { font-size: 24px !important; }
           .contact-name { font-size: 22px !important; }
+        }
+
+        @media (max-width: 420px) {
+          .property-hero { height: 400px !important; }
+          .property-hero-overlay img { height: 46px !important; margin-bottom: 10px !important; }
+          .property-hero-overlay h1 { font-size: 17px !important; }
+          .hero-price { font-size: 21px !important; }
+          .property-hero-overlay p { font-size: 12px !important; }
+          .red-banner { font-size: 17px !important; letter-spacing: 1px !important; }
+          .showings-phone { font-size: 23px !important; }
         }
       `}</style>
     </div>
