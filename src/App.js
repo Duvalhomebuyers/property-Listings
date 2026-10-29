@@ -79,6 +79,135 @@ function supabaseSignOut() {
   localStorage.removeItem("sb_refresh_token");
 }
 
+/* ============================================================
+   AGENT DIRECTORY CONFIG  —  EDIT THIS SECTION
+   ============================================================ */
+
+// Paste the "Publish to web" CSV link for your agent-roster sheet here.
+// Google Sheets: File > Share > Publish to web > pick the tab > CSV > Publish
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSUma1iNyCeY4cp9DJrJfmDn8GzFetBmU3rzB2pB7oZgu2cCyHZnFmYpslcx9h90JmyJKsBEMR7DSuK/pub?gid=290180160&single=true&output=csv";
+
+// Each key below is the URL for that agent's page.
+// "john" here  ->  deals.wholesalejax.com/agent/john
+// In the sheet's "agent" column you can type either the key ("john")
+// or the full name ("John Germaine"). Capitalization doesn't matter.
+const AGENTS = {
+  john: {
+    name: "John Germaine",
+    title: "Principal Broker",
+    phone: "904-346-0600",
+    email: "john@wholesalejax.com",
+  },
+  owen: {
+    name: "Owen Garton",
+    title: "Licensed Agent",
+    phone: "904-990-5134",
+    email: "owen@wholesalejax.com",
+  },
+  bard: {
+    name: "Bard Rockenbach",
+    title: "Licensed Agent",
+    phone: "904-990-4625",
+    email: "bard@wholesalejax.com",
+  },
+  bobby: {
+    name: "Bobby Oliver",
+    title: "Licensed Agent",
+    phone: "904-624-5748",
+    email: "agent@wholesalejax.com",
+  },
+  collin: {
+    name: "Collin Gorey",
+    title: "Licensed Agent",
+    phone: "904-304-2985",
+    email: "buyer@wholesalejax.com",
+  },
+  // To add another agent, copy one block above. The key on the left
+  // becomes the URL: newagent: { ... }  ->  /agent/newagent
+};
+
+/* ====== end of editable section ====== */
+
+// Status values that remove a listing from the agent page.
+// Anything else in the status column — including blank — stays visible.
+const HIDDEN_STATUSES = ["sold", "hide", "hidden"];
+
+// Minimal CSV parser that respects quoted fields and embedded commas.
+function parseCSV(text) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += c;
+      }
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ",") {
+      row.push(field);
+      field = "";
+    } else if (c === "\n") {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+    } else if (c !== "\r") {
+      field += c;
+    }
+  }
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
+// Turns the parsed CSV into objects keyed by lowercased header name.
+function csvToObjects(text) {
+  const rows = parseCSV(text).filter((r) => r.some((cell) => cell.trim() !== ""));
+  if (rows.length < 2) return [];
+  const headers = rows[0].map((h) => h.trim().toLowerCase());
+  return rows.slice(1).map((r) => {
+    const obj = {};
+    headers.forEach((h, i) => {
+      obj[h] = (r[i] || "").trim();
+    });
+    return obj;
+  });
+}
+
+/* ============================================================
+   SHARED FOOTER DISCLAIMERS
+   Used by BOTH the property pages and the agent directory pages.
+   Edit the wording here once and every page updates.
+   ============================================================ */
+function FooterDisclaimers() {
+  return (
+    <div style={{ padding: "24px 16px", textAlign: "center", borderTop: "1px solid #eee" }}>
+      <p style={{ fontSize: "11px", color: "#888", maxWidth: "800px", margin: "0 auto", lineHeight: "1.7" }}>
+        The estimates and assumptions presented above are not a guarantee for the performance of an investment. Prospective buyers should independently analyze and verify all assumptions on renovation costs, rental incomes, and comparable information contained above. John Germaine principal broker lic#BK3211672. Seller is marketing an assignable contract.
+        <br /><br />
+        Wholesale Realty, Duval Home Buyers and/or its agents and affiliates make no warranty, express or implied, regarding inspection reports, subject property condition or value, or other reports provided to prospective buyers by Wholesale Realty, Duval Home Buyers, the original seller, and/or any affiliated parties. We are not inspectors, contractors, or licensed home inspectors. Wholesale Realty, Duval Home Buyers, and its affiliates are operating under limited information and may not have accurate details of condition, ages, or types of home systems including but not limited to plumbing, electrical, roofing, structural, and mechanical components. Prospective contract and property buyers are urged to perform independent verification of any information regarding this property. Prospective buyers/assignees acknowledge that property is conveyed as-is where-is.
+        <br /><br />
+        By receipt of this communication recipient agrees to conduct all inquiries and discussions about the properties contained herein solely through Wholesale Realty, LLC and/or its affiliates, and shall not directly contact the seller and/or their representatives. Any unauthorized contact with the seller shall be considered intentional interference with a contract. Recipient acknowledges that Wholesale Realty, LLC and/or its affiliates will pursue damages if recipient attempts to circumvent or intentionally interfere with this contract. Recipient of this communication is in no way authorized to market the property contained herein without the express written authorization of Wholesale Realty, LLC.
+        <br /><br />
+        *Seller financing available for select properties at Seller's sole discretion. Financing may be subject to credit score and background check. Other restrictions may apply. Call for more information.
+      </p>
+    </div>
+  );
+}
+
 function generateId() {
   return Math.random().toString(36).substring(2, 10);
 }
@@ -662,18 +791,8 @@ function PropertyView({ data, onBack, shareUrl }) {
           </div>
         </div>
 
-        {/* DISCLAIMER */}
-        <div style={{ padding: "24px 16px", textAlign: "center", borderTop: "1px solid #eee" }}>
-          <p style={{ fontSize: "11px", color: "#888", maxWidth: "800px", margin: "0 auto", lineHeight: "1.7" }}>
-            The estimates and assumptions presented above are not a guarantee for the performance of an investment. Prospective buyers should independently analyze and verify all assumptions on renovation costs, rental incomes, and comparable information contained above. John Germaine principal broker lic#BK3211672. Seller is marketing an assignable contract.
-            <br /><br />
-            Wholesale Realty, Duval Home Buyers and/or its agents and affiliates make no warranty, express or implied, regarding inspection reports, subject property condition or value, or other reports provided to prospective buyers by Wholesale Realty, Duval Home Buyers, the original seller, and/or any affiliated parties. We are not inspectors, contractors, or licensed home inspectors. Wholesale Realty, Duval Home Buyers, and its affiliates are operating under limited information and may not have accurate details of condition, ages, or types of home systems including but not limited to plumbing, electrical, roofing, structural, and mechanical components. Prospective contract and property buyers are urged to perform independent verification of any information regarding this property. Prospective buyers/assignees acknowledge that property is conveyed as-is where-is.
-            <br /><br />
-            By receipt of this communication recipient agrees to conduct all inquiries and discussions about the properties contained herein solely through Wholesale Realty, LLC and/or its affiliates, and shall not directly contact the seller and/or their representatives. Any unauthorized contact with the seller shall be considered intentional interference with a contract. Recipient acknowledges that Wholesale Realty, LLC and/or its affiliates will pursue damages if recipient attempts to circumvent or intentionally interfere with this contract. Recipient of this communication is in no way authorized to market the property contained herein without the express written authorization of Wholesale Realty, LLC.
-            <br /><br />
-            *Seller financing available for select properties at Seller's sole discretion. Financing may be subject to credit score and background check. Other restrictions may apply. Call for more information.
-          </p>
-        </div>
+        {/* DISCLAIMER — shared with the agent pages, edit in FooterDisclaimers */}
+        <FooterDisclaimers />
       </div>
 
       {/* RESPONSIVE MOBILE STYLES */}
@@ -728,6 +847,196 @@ function PropertyView({ data, onBack, shareUrl }) {
   );
 }
 
+// ─── AGENT DIRECTORY PAGE ───
+function AgentPageView({ agentKey, agent }) {
+  const [listings, setListings] = useState(null); // null = still loading
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        if (!SHEET_CSV_URL || SHEET_CSV_URL.startsWith("PASTE_")) {
+          throw new Error("The listings sheet has not been connected yet.");
+        }
+
+        // 1. Pull the roster sheet
+        const csvRes = await fetch(SHEET_CSV_URL);
+        if (!csvRes.ok) throw new Error("Could not reach the listings sheet.");
+        const rows = csvToObjects(await csvRes.text());
+
+        // 2. Keep this agent's rows that aren't sold/hidden
+        const wanted = [agentKey.toLowerCase(), agent.name.toLowerCase()];
+        const mine = rows.filter((r) => {
+          const who = (r.agent || "").toLowerCase();
+          const status = (r.status || "").toLowerCase();
+          return wanted.includes(who) && !HIDDEN_STATUSES.includes(status);
+        });
+
+        const slugs = mine.map((r) => r.slug).filter(Boolean);
+        if (slugs.length === 0) {
+          if (!cancelled) setListings([]);
+          return;
+        }
+
+        // 3. One Supabase call for every slug at once
+        const props = await supabaseFetch(
+          `/properties?slug=in.(${slugs.join(",")})&select=slug,data`
+        );
+        const bySlug = {};
+        props.forEach((p) => {
+          bySlug[p.slug] = p.data;
+        });
+
+        // 4. Keep the sheet's row order; drop slugs with no matching record
+        const merged = slugs
+          .filter((s) => bySlug[s])
+          .map((s) => ({ slug: s, data: bySlug[s] }));
+
+        if (!cancelled) setListings(merged);
+      } catch (e) {
+        if (!cancelled) {
+          setLoadError(e.message || "Could not load listings.");
+          setListings([]);
+        }
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [agentKey, agent.name]);
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#fff", fontFamily: "Arial, sans-serif", color: "#222" }}>
+      {/* AGENT HEADER */}
+      <div style={{ background: "#f7f7f7", borderBottom: "1px solid #e5e5e5", padding: "28px 16px", textAlign: "center" }}>
+        <img
+          src="https://static.wixstatic.com/media/f6a0b0_5a6ee2bcabd8487d91d5db349b37cf99~mv2.png/v1/fill/w_582,h_225,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/Modernized%20Wholesale%20Logo%20(3).png"
+          alt="Wholesale Realty"
+          className="agent-logo"
+          style={{ height: "64px", maxWidth: "80%", objectFit: "contain", marginBottom: "16px" }}
+        />
+        <div className="agent-name" style={{ fontSize: "28px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px" }}>
+          {agent.name}
+        </div>
+        {agent.title && (
+          <div style={{ fontSize: "13px", color: "#666", textTransform: "uppercase", letterSpacing: "1px", marginTop: "4px" }}>
+            {agent.title}
+          </div>
+        )}
+        <div className="agent-contact" style={{ marginTop: "16px", display: "flex", justifyContent: "center", gap: "28px", flexWrap: "wrap" }}>
+          {agent.phone && (
+            <div>
+              <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px", color: "#666", marginBottom: "2px" }}>Call / Text</div>
+              <a href={`tel:${agent.phone}`} style={{ fontSize: "20px", fontWeight: "700", color: "#cc0000", textDecoration: "none" }}>
+                {agent.phone}
+              </a>
+            </div>
+          )}
+          {agent.email && (
+            <div>
+              <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px", color: "#666", marginBottom: "2px" }}>Email</div>
+              <a href={`mailto:${agent.email}`} style={{ fontSize: "16px", fontWeight: "700", color: "#222", textDecoration: "none" }}>
+                {agent.email}
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* LISTINGS */}
+      <div style={{ maxWidth: "980px", margin: "0 auto", padding: "30px 16px 50px" }}>
+        <h2 style={{ fontSize: "22px", fontWeight: "700", textAlign: "center", textTransform: "uppercase", letterSpacing: "2px", margin: "0 0 24px 0" }}>
+          Available Properties
+          {listings && listings.length > 0 && (
+            <span style={{ color: "#888", fontWeight: "400" }}> ({listings.length})</span>
+          )}
+        </h2>
+
+        {listings === null && (
+          <div style={{ textAlign: "center", color: "#888", padding: "40px 0" }}>Loading properties…</div>
+        )}
+
+        {listings && listings.length === 0 && (
+          <div style={{ textAlign: "center", color: "#888", padding: "40px 0", fontSize: "15px" }}>
+            {loadError || "No properties are currently available. Please check back soon."}
+          </div>
+        )}
+
+        {listings && listings.length > 0 && (
+          <div className="listings-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "20px" }}>
+            {listings.map(({ slug, data }) => {
+              const thumb = data.heroImageUrl || data.photo1Url || "";
+              const specs = [
+                data.beds && `${data.beds} Bed`,
+                data.baths && `${data.baths} Bath`,
+                data.sqft && `${data.sqft} SQFT`,
+              ]
+                .filter(Boolean)
+                .join(" | ");
+              return (
+                <a
+                  key={slug}
+                  href={`/p/${slug}`}
+                  style={{
+                    display: "block",
+                    textDecoration: "none",
+                    color: "#222",
+                    border: "1px solid #e5e5e5",
+                    borderRadius: "6px",
+                    overflow: "hidden",
+                    background: "#fff",
+                  }}
+                >
+                  {thumb ? (
+                    <img src={thumb} alt={data.address || "Property"} style={{ width: "100%", height: "180px", objectFit: "cover", display: "block" }} />
+                  ) : (
+                    <div style={{ width: "100%", height: "180px", background: "#eee", display: "flex", alignItems: "center", justifyContent: "center", color: "#aaa", fontSize: "13px" }}>
+                      No photo
+                    </div>
+                  )}
+                  <div style={{ padding: "14px" }}>
+                    <div style={{ fontSize: "15px", fontWeight: "700", lineHeight: "1.3", marginBottom: "6px" }}>
+                      {data.address || "Property"}
+                    </div>
+                    {data.askingPrice && (
+                      <div style={{ fontSize: "20px", fontWeight: "700", color: "#cc0000", marginBottom: "6px" }}>
+                        {data.askingPrice}
+                      </div>
+                    )}
+                    {specs && <div style={{ fontSize: "13px", color: "#666" }}>{specs}</div>}
+                    <div style={{ marginTop: "12px", fontSize: "12px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "1px", color: "#222" }}>
+                      View Details →
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* FOOTER — shared with the property pages, edit in FooterDisclaimers */}
+      <FooterDisclaimers />
+
+      <style>{`
+        @media (max-width: 900px) {
+          .listings-grid { grid-template-columns: 1fr 1fr !important; }
+        }
+        @media (max-width: 600px) {
+          .listings-grid { grid-template-columns: 1fr !important; }
+          .agent-name { font-size: 22px !important; }
+          .agent-logo { height: 50px !important; }
+          .agent-contact { gap: 18px !important; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 // ─── MAIN APP ───
 export default function App() {
   const [data, setData] = useState(INITIAL_DATA);
@@ -738,10 +1047,25 @@ export default function App() {
   const [isSharedView, setIsSharedView] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [agentKey, setAgentKey] = useState(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const id = params.get("p");
+
+    // Agent directory page: /agent/<key>
+    const agentMatch = window.location.pathname.match(/^\/agent\/([^/]+)\/?$/i);
+    if (agentMatch) {
+      const key = decodeURIComponent(agentMatch[1]).toLowerCase();
+      setAuthChecked(true);
+      if (AGENTS[key]) {
+        setAgentKey(key);
+        setView("agent");
+      } else {
+        setView("agentNotFound");
+      }
+      return;
+    }
 
     if (id) {
       // Shared link — no auth needed, go straight to property view
@@ -834,7 +1158,13 @@ export default function App() {
       {error && (
         <div style={{ position: "fixed", top: "16px", right: "16px", zIndex: 100, background: "#e53e3e", color: "#fff", padding: "10px 18px", borderRadius: "8px", fontSize: "14px", boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>{error}</div>
       )}
-      {view === "login" ? (
+      {view === "agent" ? (
+        <AgentPageView agentKey={agentKey} agent={AGENTS[agentKey]} />
+      ) : view === "agentNotFound" ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "Arial, sans-serif", color: "#888" }}>
+          <div>Agent page not found.</div>
+        </div>
+      ) : view === "login" ? (
         <LoginView onLogin={handleLogin} />
       ) : view === "form" ? (
         <FormView data={data} setData={setData} onGenerate={generate} saving={saving} onSignOut={handleSignOut} />

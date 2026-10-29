@@ -3,6 +3,10 @@
     {
       "source": "/p/:slug",
       "destination": "/api/og?p=:slug"
+    },
+    {
+      "source": "/agent/:name",
+      "destination": "/index.html"
     }
   ]
 }
